@@ -52,3 +52,8 @@ server <- function(input, output) {
       theme_pubclean()
   })
 }
+
+
+
+shinyApp(ui = ui, server = server)
+
