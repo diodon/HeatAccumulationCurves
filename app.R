@@ -61,6 +61,7 @@ server <- function(input, output) {
       names(polyPred)[3] = "nDays"
       polyPredAll = bind_rows(polyPredAll, polyPred)
     }
+    polyPredAll$nDays[polyPredAll$nDays<0] = 0
     
     #get point por labels
     dfLabels = dfSite %>% group_by(year, SLFL) %>% 
