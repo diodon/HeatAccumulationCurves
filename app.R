@@ -4,11 +4,18 @@ library(ggplot2)
 library(dplyr)
 library(ggrepel)
 library(ggpubr)
+options(dplyr.summarise.inform = FALSE)
 
 
 ## read data
 df = read_csv("bkCurve_all.csv", col_types = cols())
 dfMD = read_csv("bkCurve_siteMetadata.csv", col_types = cols())
+dfMD = dfMD %>% group_by(siteName, SLFL) %>% mutate(yearRank = rank(-Tq50))
+df = left_join(df, dfMD[,c("siteName", "SLFL", "year", "yearRank")])
+dfTop5 = df %>% filter(yearRank<=5) %>% 
+  group_by(siteName, SLFL, temp) %>% 
+  summarise(nDaysMean = mean(nDays))
+  
 siteList = unique(df$siteName)
 
 # Define UI
@@ -38,15 +45,31 @@ server <- function(input, output) {
   
   output$distPlot <- renderPlot({
     dfSite = df[df$siteName==input$site,]
-    dfMDSite = dfMD[dfMD$site_name==input$site,]
+    dfMDSite = dfMD[dfMD$siteName==input$site,]
+    dfTop5 = dfTop5[dfTop5$siteName==input$site,]
+    topSLFLList = unique(dfTop5$SLFL)
+    
+    ## fit polynomial for each location
+    polyPredAll = data.frame()
+    for (location in topSLFLList){
+      model = lm(nDaysMean~poly(temp, 5), data=dfTop5, subset = SLFL==location)
+      tempList = sort(unique(dfTop5$temp[dfTop5$SLFL==location]))
+      polyPred = data.frame(SLFL = rep(location, length(tempList)), 
+                            temp=tempList, 
+                            nDays = predict(model, data.frame(temp=tempList)))
+      polyPredAll = bind_rows(polyPredAll, polyPred)
+    }
     
     #get point por labels
     dfLabels = dfSite %>% group_by(year, SLFL) %>% summarise(temp = min(temp), nDays = nDays[which.min(temp)])
     
     pp = ggplot(dfSite, aes(temp, nDays, group=factor(year)))
     pp + geom_line(aes(colour=factor(year)), alpha=0.5, size=0.3) + 
-      geom_line(data=dfSite %>% filter(year==2017), aes(temp, nDays), colour="red", size=1) + 
-      geom_line(data=dfSite %>% filter(year==2016), aes(temp, nDays), colour="orange", size=1) + 
+      geom_line(data=dfSite %>% filter(year==2017), aes(temp, nDays), colour="#feedde", size=1.5) + 
+      geom_line(data=dfSite %>% filter(year==2016), aes(temp, nDays), colour="#fdbe85", size=1.5) + 
+      geom_line(data=dfSite %>% filter(year==2002), aes(temp, nDays), colour="#fd8d3c", size=1.5) +
+      geom_line(data=dfSite %>% filter(year==1998), aes(temp, nDays), colour="#d94701", size=1.5) +
+      geom_line(data=polyPredAll, aes(temp, nDays, group=NA), colour="black", size=1.5) + ## plot the TOP5 average
       geom_text_repel(data=dfLabels, aes(label=year), size=3) + 
       labs(title=input$site, x="Temperature (°C)", y ="Number of days above temperature") + 
       facet_grid(SLFL~.) + 
