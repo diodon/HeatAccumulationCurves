@@ -10,6 +10,7 @@ options(dplyr.summarise.inform = FALSE)
 
 ## read data
 df = read_csv("bkCurve_all.csv", col_types = cols())
+df = df[complete.cases(df),]
 dfMD = read_csv("bkCurve_siteMetadata.csv", col_types = cols())
 dfMD = dfMD %>% group_by(siteName, SLFL) %>% mutate(yearRank = rank(-Tq50))
 df = left_join(df, dfMD[,c("siteName", "SLFL", "year", "yearRank")])
